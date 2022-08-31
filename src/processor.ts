@@ -97,6 +97,10 @@ async function isErc721 (ctx: Context, blockHeight: number, contractAddress: str
   }
 }
 
+function collectionWithTokenId (collection: string, tokenId: string): string {
+  return `${collection}-${tokenId}`
+}
+
 function handleTransfer(
   block: SubstrateBlock,
   event: EvmLogEvent
@@ -129,7 +133,7 @@ async function saveTransfers(ctx: Context, transfersData: TransferData[]) {
   const contractAddresses: Set<string> = new Set();
 
   for (const transferData of transfersData) {
-    tokensIds.add(transferData.token);
+    tokensIds.add(collectionWithTokenId(transferData.contractAddress, transferData.token));
     ownersIds.add(transferData.from);
     ownersIds.add(transferData.to);
     contractAddresses.add(transferData.contractAddress)
@@ -184,10 +188,10 @@ async function saveTransfers(ctx: Context, transfersData: TransferData[]) {
       owners.set(to.id, to);
     }
 
-    let token = tokens.get(`${contractMapping.get(transferData.contractAddress)?.contractModel.symbol || ""}-${transferData.token}`);
+    let token = tokens.get(collectionWithTokenId(transferData.contractAddress, transferData.token));
     if (token == null) {
       token = new Token({
-        id: `${contractMapping.get(transferData.contractAddress)?.contractModel.symbol || ""}-${transferData.token}`,
+        id: collectionWithTokenId(transferData.contractAddress, transferData.token),
         uri: await tokenContract.tokenURI(ethers.BigNumber.from(transferData.token)),
         contract: collection,
       });
