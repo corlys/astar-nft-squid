@@ -174,6 +174,7 @@ async function saveTransfers(ctx: Context, transfersData: TransferData[]) {
           id: transferData.contractAddress,
         }
       )
+      collections.set(collection.id, collection)
     }
 
     let from = owners.get(transferData.from);
