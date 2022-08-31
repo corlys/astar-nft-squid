@@ -1,3 +1,4 @@
+// src/processor.ts
 import { lookupArchive } from "@subsquid/archive-registry";
 import { Store, TypeormDatabase } from "@subsquid/typeorm-store";
 import {
@@ -8,22 +9,29 @@ import {
   SubstrateBlock,
 } from "@subsquid/substrate-processor";
 import { In } from "typeorm";
-import { ethers } from "ethers";
-import { CHAIN_NODE, contractAddress, getContractEntity } from "./contract";
-import { Owner, Token, Transfer } from "./model";
+import {
+  CHAIN_NODE,
+  astarDegenscontract,
+  getContractEntity,
+  getTokenURI,
+  astarCatsContract,
+  contractMapping,
+} from "./contract";
+import { Owner, Token, Transfer, Contract } from "./model";
 import * as erc721 from "./abi/erc721";
+import { ethers } from "ethers";
 
 const database = new TypeormDatabase();
 const processor = new SubstrateBatchProcessor()
   .setBatchSize(500)
   .setDataSource({
     chain: CHAIN_NODE,
-    archive: lookupArchive("moonriver", { release: "FireSquid" }),
+    archive: lookupArchive("astar", { release: "FireSquid" }),
   })
-  .setTypesBundle("moonbeam")
-  .addEvmLog(contractAddress, {
+  .setTypesBundle("astar")
+  .addEvmLog("*", {
     filter: [erc721.events["Transfer(address,address,uint256)"].topic],
-  });
+  })
 
 type Item = BatchProcessorItem<typeof processor>;
 type Context = BatchContext<Store, Item>;
@@ -34,7 +42,7 @@ processor.run(database, async (ctx) => {
   for (const block of ctx.blocks) {
     for (const item of block.items) {
       if (item.name === "EVM.Log") {
-        const transfer = handleTransfer(ctx, block.header, item.event);
+        const transfer = handleTransfer(block.header, item.event);
         transfersData.push(transfer);
       }
     }
@@ -47,14 +55,14 @@ type TransferData = {
   id: string;
   from: string;
   to: string;
-  token: ethers.BigNumber;
+  token: string;
   timestamp: bigint;
   block: number;
   transactionHash: string;
+  contractAddress: string;
 };
 
 function handleTransfer(
-  ctx: Context,
   block: SubstrateBlock,
   event: EvmLogEvent
 ): TransferData {
@@ -64,12 +72,13 @@ function handleTransfer(
 
   const transfer: TransferData = {
     id: event.id,
-    token: tokenId,
+    token: tokenId.toString(),
     from,
     to,
     timestamp: BigInt(block.timestamp),
     block: block.height,
     transactionHash: event.evmTxHash,
+    contractAddress: event.args.address,
   };
 
   return transfer;
@@ -78,11 +87,13 @@ function handleTransfer(
 async function saveTransfers(ctx: Context, transfersData: TransferData[]) {
   const tokensIds: Set<string> = new Set();
   const ownersIds: Set<string> = new Set();
+  const contractAddresses: Set<string> = new Set();
 
   for (const transferData of transfersData) {
-    tokensIds.add(transferData.token.toString());
+    tokensIds.add(transferData.token);
     ownersIds.add(transferData.from);
     ownersIds.add(transferData.to);
+    contractAddresses.add(transferData.contractAddress)
   }
 
   const transfers: Set<Transfer> = new Set();
@@ -101,12 +112,26 @@ async function saveTransfers(ctx: Context, transfersData: TransferData[]) {
     ])
   );
 
+  const collections: Map<string, Contract> = new Map(
+    (await ctx.store.findBy(Contract, { id: In([...contractAddresses]) })).map((collection) => [
+      collection.id,
+      collection,
+    ])
+  )
+
   for (const transferData of transfersData) {
-    const contract = new erc721.Contract(
-      ctx,
-      { height: transferData.block },
-      contractAddress
-    );
+
+    const blockHeight = { height: transferData.block}
+    const tokenContract = new erc721.Contract(ctx, blockHeight, transferData.contractAddress)
+
+    let collection = collections.get(transferData.contractAddress)
+    if (collection == null) {
+      collection = new Contract(
+        {
+          id: transferData.contractAddress,
+        }
+      )
+    }
 
     let from = owners.get(transferData.from);
     if (from == null) {
@@ -120,14 +145,12 @@ async function saveTransfers(ctx: Context, transfersData: TransferData[]) {
       owners.set(to.id, to);
     }
 
-    const tokenId = transferData.token.toString();
-
-    let token = tokens.get(tokenId);
+    let token = tokens.get(`${contractMapping.get(transferData.contractAddress)?.contractModel.symbol || ""}-${transferData.token}`);
     if (token == null) {
       token = new Token({
-        id: tokenId,
-        uri: await contract.tokenURI(transferData.token),
-        contract: await getContractEntity(ctx.store),
+        id: `${contractMapping.get(transferData.contractAddress)?.contractModel.symbol || ""}-${transferData.token}`,
+        uri: await tokenContract.tokenURI(ethers.BigNumber.from(transferData.token)),
+        contract: collection,
       });
       tokens.set(token.id, token);
     }
@@ -148,6 +171,7 @@ async function saveTransfers(ctx: Context, transfersData: TransferData[]) {
     transfers.add(transfer);
   }
 
+  await ctx.store.save([...collections.values()])
   await ctx.store.save([...owners.values()]);
   await ctx.store.save([...tokens.values()]);
   await ctx.store.save([...transfers]);
