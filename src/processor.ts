@@ -42,8 +42,11 @@ processor.run(database, async (ctx) => {
   for (const block of ctx.blocks) {
     for (const item of block.items) {
       if (item.name === "EVM.Log") {
-        const transfer = handleTransfer(block.header, item.event);
-        transfersData.push(transfer);
+        // ctx.log.info(item.event.args?.address)
+        if (await isErc721(ctx, block.header.height, item.event.args.address)) {
+          const transfer = handleTransfer(block.header, item.event);
+          if (transfer) transfersData.push(transfer);
+        }
       }
     }
   }
@@ -62,26 +65,62 @@ type TransferData = {
   contractAddress: string;
 };
 
+async function isErc721 (ctx: Context, blockHeight: number, contractAddress: string): Promise<boolean> {
+  const contract = new erc721.Contract(ctx, { height: blockHeight }, contractAddress);
+  try {
+    // check if ERC165 interface
+    const checkERC165 = await contract.supportsInterface('0x01ffc9a7')
+    if (checkERC165) {
+      ctx.log.info(`Pass 165 ${contractAddress}`)
+      // check if ERC721 interface
+      const checkERC721 = await contract.supportsInterface('0x80ac58cd')
+      if (checkERC721) {
+        ctx.log.info(`Pass 721 ${contractAddress}`)
+        try {
+          const balance = await contract.balanceOf("0")
+          ctx.log.info(`Balance: ${balance}`)
+          return false
+        } catch (error) {
+          return true
+        }
+      } else {
+        ctx.log.error(`Gagal di 721 ${contractAddress}`);
+        return false
+      }
+    } else {
+      ctx.log.error(`Gagal di 165 ${contractAddress}`);
+      return false
+    }
+  } catch (error: any) {
+    ctx.log.error(`Gagal di General ${contractAddress} ${error}`);
+    return false
+  }
+}
+
 function handleTransfer(
   block: SubstrateBlock,
   event: EvmLogEvent
-): TransferData {
-  const { from, to, tokenId } = erc721.events[
-    "Transfer(address,address,uint256)"
-  ].decode(event.args);
-
-  const transfer: TransferData = {
-    id: event.id,
-    token: tokenId.toString(),
-    from,
-    to,
-    timestamp: BigInt(block.timestamp),
-    block: block.height,
-    transactionHash: event.evmTxHash,
-    contractAddress: event.args.address,
-  };
-
-  return transfer;
+): TransferData | null {
+  try {
+    const { from, to, tokenId } = erc721.events[
+      "Transfer(address,address,uint256)"
+    ].decode(event.args);
+  
+    const transfer: TransferData = {
+      id: event.id,
+      token: tokenId.toString(),
+      from,
+      to,
+      timestamp: BigInt(block.timestamp),
+      block: block.height,
+      transactionHash: event.evmTxHash,
+      contractAddress: event.args.address,
+    };
+  
+    return transfer;
+  } catch (error) {
+    return null
+  }
 }
 
 async function saveTransfers(ctx: Context, transfersData: TransferData[]) {
