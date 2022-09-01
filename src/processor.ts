@@ -66,6 +66,11 @@ type TransferData = {
 };
 
 async function isErc721 (ctx: Context, blockHeight: number, contractAddress: string): Promise<boolean> {
+  
+  const collection = await ctx.store.get(Contract, contractAddress)
+
+  if (collection) return true
+  
   const contract = new erc721.Contract(ctx, { height: blockHeight }, contractAddress);
   try {
     // check if ERC165 interface
