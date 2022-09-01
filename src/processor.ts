@@ -43,9 +43,14 @@ processor.run(database, async (ctx) => {
     for (const item of block.items) {
       if (item.name === "EVM.Log") {
         // ctx.log.info(item.event.args?.address)
-        if (await isErc721(ctx, block.header.height, item.event.args.address)) {
-          const transfer = handleTransfer(block.header, item.event);
-          if (transfer) transfersData.push(transfer);
+        const topics: string[] = item.event.args.topics;
+        if (topics[0] === erc721.events["Transfer(address,address,uint256)"].topic) {
+          if (await isErc721(ctx, block.header.height, item.event.args.address)) {
+            ctx.log.info(`${topics[0]} ${block.header.height}`)
+            ctx.log.info(`${erc721.events["Transfer(address,address,uint256)"].topic} ${block.header.height}`)
+            const transfer = handleTransfer(block.header, item.event);
+            if (transfer) transfersData.push(transfer);
+          }
         }
       }
     }
@@ -89,15 +94,15 @@ async function isErc721 (ctx: Context, blockHeight: number, contractAddress: str
           return true
         }
       } else {
-        ctx.log.error(`Gagal di 721 ${contractAddress}`);
+        // ctx.log.error(`Gagal di 721 ${contractAddress}`);
         return false
       }
     } else {
-      ctx.log.error(`Gagal di 165 ${contractAddress}`);
+      // ctx.log.error(`Gagal di 165 ${contractAddress}`);
       return false
     }
   } catch (error: any) {
-    ctx.log.error(`Gagal di General ${contractAddress} ${error}`);
+    // ctx.log.error(`Gagal di General ${contractAddress} ${error}`);
     return false
   }
 }
