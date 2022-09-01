@@ -11,12 +11,8 @@ import {
 import { In } from "typeorm";
 import {
   CHAIN_NODE,
-  astarDegenscontract,
-  getContractEntity,
-  getTokenURI,
-  astarCatsContract,
-  contractMapping,
 } from "./contract";
+import { getWhitelistNFT } from "./helper/whitelistnftlist"
 import { Owner, Token, Transfer, Contract } from "./model";
 import * as erc721 from "./abi/erc721";
 import { ethers } from "ethers";
@@ -29,7 +25,7 @@ const processor = new SubstrateBatchProcessor()
     archive: lookupArchive("astar", { release: "FireSquid" }),
   })
   .setTypesBundle("astar")
-  .addEvmLog("*", {
+  .addEvmLog(getWhitelistNFT(), {
     filter: [erc721.events["Transfer(address,address,uint256)"].topic],
   })
 
