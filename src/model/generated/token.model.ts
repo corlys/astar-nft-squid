@@ -25,4 +25,7 @@ export class Token {
   @Index_()
   @ManyToOne_(() => Contract, {nullable: true})
   contract!: Contract | undefined | null
+
+  @Column_("int4", {nullable: false})
+  tokenId!: number
 }

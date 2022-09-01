@@ -200,6 +200,7 @@ async function saveTransfers(ctx: Context, transfersData: TransferData[]) {
         id: collectionWithTokenId(transferData.contractAddress, transferData.token),
         uri: await tokenContract.tokenURI(ethers.BigNumber.from(transferData.token)),
         contract: collection,
+        tokenId: parseInt(transferData.token)
       });
       tokens.set(token.id, token);
     }
