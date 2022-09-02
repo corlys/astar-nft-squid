@@ -2,6 +2,8 @@ type Token @entity {
   id: ID!
   owner: Owner
   uri: String
+  oldUri: String
+  imageUri: String
   transfers: [Transfer!]! @derivedFrom(field: "token")
   contract: Contract
   tokenId: Int!

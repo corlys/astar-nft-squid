@@ -19,6 +19,12 @@ export class Token {
   @Column_("text", {nullable: true})
   uri!: string | undefined | null
 
+  @Column_("text", {nullable: true})
+  oldUri!: string | undefined | null
+
+  @Column_("text", {nullable: true})
+  imageUri!: string | undefined | null
+
   @OneToMany_(() => Transfer, e => e.token)
   transfers!: Transfer[]
 

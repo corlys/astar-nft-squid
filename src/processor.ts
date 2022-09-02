@@ -16,6 +16,7 @@ import { getWhitelistNFT } from "./helper/whitelistnftlist"
 import { Owner, Token, Transfer, Contract } from "./model";
 import * as erc721 from "./abi/erc721";
 import { ethers } from "ethers";
+import axios from "axios"
 
 const database = new TypeormDatabase();
 const processor = new SubstrateBatchProcessor()
@@ -41,12 +42,10 @@ processor.run(database, async (ctx) => {
         // ctx.log.info(item.event.args?.address)
         const topics: string[] = item.event.args.topics;
         if (topics[0] === erc721.events["Transfer(address,address,uint256)"].topic) {
-          if (await isErc721(ctx, block.header.height, item.event.args.address)) {
-            ctx.log.info(`${topics[0]} ${block.header.height}`)
-            ctx.log.info(`${erc721.events["Transfer(address,address,uint256)"].topic} ${block.header.height}`)
-            const transfer = handleTransfer(block.header, item.event);
-            if (transfer) transfersData.push(transfer);
-          }
+          ctx.log.info(`${topics[0]} ${block.header.height}`)
+          ctx.log.info(`${erc721.events["Transfer(address,address,uint256)"].topic} ${block.header.height}`)
+          const transfer = handleTransfer(block.header, item.event);
+          if (transfer) transfersData.push(transfer);
         }
       }
     }
@@ -65,6 +64,11 @@ type TransferData = {
   transactionHash: string;
   contractAddress: string;
 };
+
+type MetaData = {
+  image?: string;
+  image_alt?: string
+}
 
 async function isErc721 (ctx: Context, blockHeight: number, contractAddress: string): Promise<boolean> {
   
@@ -107,6 +111,67 @@ function collectionWithTokenId (collection: string, tokenId: string): string {
   return `${collection}-${tokenId}`
 }
 
+async function handleImage(tokenURI: string) {
+  try {
+    // check if the URI is centralized of decentralizer
+    // if its decentralized
+    if (tokenURI.length === 0) return null
+    if (tokenURI.includes("ipfs://")) {
+      const { data: { image, image_alt } } = await axios.get<MetaData>(tokenURI.replace("ipfs://", "https://nftstorage.link/ipfs/"))
+
+      if (image) return image
+      if (image_alt) return image_alt
+      return null
+
+    } else {
+
+      const { data: { image, image_alt} } = await axios.get<MetaData>(tokenURI)
+
+      if (image) return image
+      if (image_alt) return image_alt
+      return null
+    }
+  } catch (error) {
+    return null
+  }
+}
+
+async function handleChangeURI (
+  ctx: Context, 
+  oldURI: string, 
+  blockHeight: number, 
+  contractAddress: string,
+  oldTokens: Map<string, Token>
+) {
+  let tokens: Map<string, Token> = new Map(
+    (await ctx.store.findBy(Token, { uri: oldURI })).map((token) => [
+      token.id,
+      token,
+    ])
+  );
+
+  for (const tempToken of tokens) {
+    const token = tempToken[1];
+    token.uri = await handleURI(ctx, blockHeight, contractAddress, token.tokenId.toString());
+    token.oldUri = token.uri;
+    token.imageUri = await handleImage(token.uri);
+    oldTokens.set(token.id, token);
+  }
+
+  return oldTokens;
+
+}
+
+async function handleURI (ctx: Context, height: number, contractAddress: string, tokenId: string): Promise<string> {
+  try {
+    const tokenContract = new erc721.Contract(ctx, { height }, contractAddress)
+    return await tokenContract.tokenURI(ethers.BigNumber.from(tokenId)) 
+  } catch (error: any) {
+    ctx.log.error(error)
+    return ""
+  }
+}
+
 function handleTransfer(
   block: SubstrateBlock,
   event: EvmLogEvent
@@ -147,7 +212,7 @@ async function saveTransfers(ctx: Context, transfersData: TransferData[]) {
 
   const transfers: Set<Transfer> = new Set();
 
-  const tokens: Map<string, Token> = new Map(
+  let tokens: Map<string, Token> = new Map(
     (await ctx.store.findBy(Token, { id: In([...tokensIds]) })).map((token) => [
       token.id,
       token,
@@ -197,15 +262,28 @@ async function saveTransfers(ctx: Context, transfersData: TransferData[]) {
 
     let token = tokens.get(collectionWithTokenId(transferData.contractAddress, transferData.token));
     if (token == null) {
+      const uri = await tokenContract.tokenURI(ethers.BigNumber.from(transferData.token))
       token = new Token({
         id: collectionWithTokenId(transferData.contractAddress, transferData.token),
-        uri: await tokenContract.tokenURI(ethers.BigNumber.from(transferData.token)),
+        uri,
+        oldUri: uri,
+        imageUri: await handleImage(uri),
         contract: collection,
         tokenId: parseInt(transferData.token)
       });
       tokens.set(token.id, token);
     }
-    token.owner = to;
+
+    const currentURI = await tokenContract.tokenURI(ethers.BigNumber.from(transferData.token));
+    if (token.oldUri !== currentURI) tokens = await handleChangeURI(ctx, currentURI, blockHeight.height, transferData.contractAddress, tokens)
+
+    token = tokens.get(collectionWithTokenId(transferData.contractAddress, transferData.token));
+    if (token != null) {
+      token.owner = to
+      token.uri = currentURI
+      token.oldUri = token.uri
+      tokens.set(token.id, token)
+    }
 
     const { id, block, transactionHash, timestamp } = transferData;
 
