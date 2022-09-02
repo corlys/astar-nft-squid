@@ -282,6 +282,7 @@ async function saveTransfers(ctx: Context, transfersData: TransferData[]) {
       token.owner = to
       token.uri = currentURI
       token.oldUri = token.uri
+      token.imageUri = await handleImage(token.uri)
       tokens.set(token.id, token)
     }
 
