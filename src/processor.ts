@@ -152,7 +152,7 @@ async function handleChangeURI (
     ])
   );
 
-  ctx.log.warn(`Changing oldURI : ${oldURI}, tokens that have this uri is${[...tokens.values()].length} from collection ${contractAddress}`)
+  ctx.log.warn(`Changing oldURI : ${oldURI}, tokens that have this uri is ${[...tokens.values()].length} from collection ${contractAddress}`)
 
   for (const tempToken of tokens) {
     const token = tempToken[1];
@@ -281,7 +281,7 @@ async function saveTransfers(ctx: Context, transfersData: TransferData[]) {
       tokens.set(token.id, token);
     } else {
       const currentURI = await handleURI(ctx, blockHeight.height, transferData.contractAddress, transferData.token)
-      if (token.oldUri !== currentURI) tokens = await handleChangeURI(ctx, currentURI, blockHeight.height, transferData.contractAddress, tokens)
+      if (token.oldUri !== currentURI) tokens = await handleChangeURI(ctx, token.oldUri ?? "", blockHeight.height, transferData.contractAddress, tokens)
 
       token = tokens.get(collectionWithTokenId(transferData.contractAddress, transferData.token));
       if (token != null) {
