@@ -116,24 +116,33 @@ async function handleImage(tokenURI: string, ctx: Context) {
     // if its decentralized
     if (tokenURI.length === 0) return null
     if (tokenURI.includes("ipfs://")) {
-      const { data: { image, image_alt } } = await axios.get<MetaData>(tokenURI.replace("ipfs://", "https://nftstorage.link/ipfs/"))
+      try {
+        const { data: { image, image_alt } } = await axios.get<MetaData>(tokenURI.replace("ipfs://", "https://nftstorage.link/ipfs/"))
 
-      if (image) return image
-      if (image_alt) return image_alt
-      ctx.log.error(`Data does not exist: ${image} ${image_alt}`)
-      return null
+        if (image) return image
+        if (image_alt) return image_alt
+        ctx.log.error(`Data does not exist: ${image} ${image_alt}`)
+        return null
+      } catch (error) {
+        ctx.log.error(`Fetching Image Error: ${tokenURI.replace("ipfs://", "https://nftstorage.link/ipfs/")} - ${error}`)
+        return null
+      }
 
     } else {
-
-      const { data: { image, image_alt} } = await axios.get<MetaData>(tokenURI)
-
-      if (image) return image
-      if (image_alt) return image_alt
-      ctx.log.error(`Data does not exist: ${image} ${image_alt}`)
-      return null
+      try {
+        const { data: { image, image_alt} } = await axios.get<MetaData>(tokenURI)
+  
+        if (image) return image
+        if (image_alt) return image_alt
+        ctx.log.error(`Data does not exist: ${image} ${image_alt}`)
+        return null  
+      } catch (error) {
+        ctx.log.error(`Fetching Image Error: ${tokenURI} - ${error}`)
+        return null
+      }
     }
   } catch (error: any) {
-    ctx.log.error(`fetching image error: ${error}`)
+    ctx.log.error(`error handleImage: ${error}`)
     return null
   }
 }
@@ -170,7 +179,9 @@ async function handleChangeURI (
 
 async function handleURI (ctx: Context, height: number, contractAddress: string, tokenId: string): Promise<string> {
   try {
-    const tokenContract = new erc721.Contract(ctx, { height }, contractAddress)
+    // hardcode the block height to recent block until know how to get the highest block
+    const hardCodedBlockHeight = 1789333;
+    const tokenContract = new erc721.Contract(ctx, { height: hardCodedBlockHeight }, contractAddress)
     return await tokenContract.tokenURI(ethers.BigNumber.from(tokenId)) 
   } catch (error: any) {
     ctx.log.error(`Error handling URI : ${error}`)
@@ -242,7 +253,6 @@ async function saveTransfers(ctx: Context, transfersData: TransferData[]) {
   for (const transferData of transfersData) {
 
     const blockHeight = { height: transferData.block}
-    const tokenContract = new erc721.Contract(ctx, blockHeight, transferData.contractAddress)
 
     let collection = collections.get(transferData.contractAddress)
     if (collection == null) {
@@ -276,23 +286,27 @@ async function saveTransfers(ctx: Context, transfersData: TransferData[]) {
         imageUri: await handleImage(uri, ctx),
         contract: collection,
         tokenId: parseInt(transferData.token),
-        owner: to
       });
       tokens.set(token.id, token);
-    } else {
-      const currentURI = await handleURI(ctx, blockHeight.height, transferData.contractAddress, transferData.token)
-      if (token.oldUri !== currentURI) tokens = await handleChangeURI(ctx, token.oldUri ?? "", blockHeight.height, transferData.contractAddress, tokens)
+    } 
+    // else {
+    //   const currentURI = await handleURI(ctx, blockHeight.height, transferData.contractAddress, transferData.token)
+    //   if (token.oldUri !== currentURI) tokens = await handleChangeURI(ctx, token.oldUri ?? "", blockHeight.height, transferData.contractAddress, tokens)
 
-      token = tokens.get(collectionWithTokenId(transferData.contractAddress, transferData.token));
-      if (token != null) {
-        token.owner = to
-        token.uri = currentURI
-        token.oldUri = token.uri
-        token.imageUri = await handleImage(token.uri, ctx)
-        tokens.set(token.id, token)
-        ctx.log.info(`${token.id} - ${token.uri} - ${token.imageUri} - ${token.oldUri}`)
-      }
-    }
+    //   token = tokens.get(collectionWithTokenId(transferData.contractAddress, transferData.token));
+    //   if (token != null) {
+    //     token.owner = to
+    //     token.uri = currentURI
+    //     token.oldUri = token.uri
+    //     token.imageUri = await handleImage(token.uri, ctx)
+    //     tokens.set(token.id, token)
+    //     ctx.log.info(`${token.id} - ${token.uri} - ${token.imageUri} - ${token.oldUri}`)
+    //   }
+    // }
+
+    token.owner = to
+
+    ctx.log.info(`${token.id} - ${token.uri} - ${token.imageUri} - ${token.oldUri}`)
 
     const { id, block, transactionHash, timestamp } = transferData;
 
