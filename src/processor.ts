@@ -8,7 +8,7 @@ import {
   SubstrateBatchProcessor,
   SubstrateBlock,
 } from "@subsquid/substrate-processor";
-import { In } from "typeorm";
+import { FindOperator, In, IsNull } from "typeorm";
 import {
   CHAIN_NODE,
 } from "./contract";
@@ -51,6 +51,7 @@ processor.run(database, async (ctx) => {
   }
 
   await saveTransfers(ctx, transfersData);
+  await handleNullImage(ctx)
 });
 
 type TransferData = {
@@ -117,7 +118,7 @@ async function handleImage(tokenURI: string, ctx: Context) {
     if (tokenURI.length === 0) return null
     if (tokenURI.includes("ipfs://")) {
       try {
-        const { data } = await axios.get<MetaData>(tokenURI.replace("ipfs://", "https://nftstorage.link/ipfs/"))
+        const { data } = await axios.get<MetaData>(tokenURI.replace("ipfs://", "https://nftstorage.link/ipfs/"), { timeout: 40000 })
 
         if (data?.image) return data.image
         if (data?.image_alt) return data.image_alt
@@ -130,7 +131,7 @@ async function handleImage(tokenURI: string, ctx: Context) {
 
     } else {
       try {
-        const { data } = await axios.get<MetaData>(tokenURI)
+        const { data } = await axios.get<MetaData>(tokenURI.replace("https://", "http://"), { timeout: 40000 })
   
         if (data?.image) return data.image
         if (data?.image_alt) return data.image_alt
@@ -145,6 +146,25 @@ async function handleImage(tokenURI: string, ctx: Context) {
     ctx.log.error(`error handleImage: ${error}`)
     return null
   }
+}
+
+async function handleNullImage (ctx: Context) {
+  let tokens: Map<string, Token> = new Map(
+    (await ctx.store.find(Token, { where: { imageUri : IsNull() } })).map((token) => [
+      token.id,
+      token,
+    ])
+  );
+
+  for (const token of tokens) {
+    const _token = token[1]
+    if (_token.uri) {
+      _token.imageUri = await handleImage(_token.uri, ctx)
+      tokens.set(_token.id, _token)
+    }
+  }
+
+  await ctx.store.save([...tokens.values()])
 }
 
 async function handleChangeURI (
