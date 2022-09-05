@@ -201,7 +201,7 @@ async function handleURI (ctx: Context, height: number, contractAddress: string,
   try {
     // hardcode the block height to recent block until know how to get the highest block
     const hardCodedBlockHeight = 1789333;
-    const tokenContract = new erc721.Contract(ctx, { height: hardCodedBlockHeight > height ? height : hardCodedBlockHeight }, contractAddress)
+    const tokenContract = new erc721.Contract(ctx, { height: hardCodedBlockHeight > height ? hardCodedBlockHeight : height }, contractAddress)
     return await tokenContract.tokenURI(ethers.BigNumber.from(tokenId)) 
   } catch (error: any) {
     ctx.log.error(`Error handling URI : ${error}`)
