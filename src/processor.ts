@@ -117,11 +117,11 @@ async function handleImage(tokenURI: string, ctx: Context) {
     if (tokenURI.length === 0) return null
     if (tokenURI.includes("ipfs://")) {
       try {
-        const { data: { image, image_alt } } = await axios.get<MetaData>(tokenURI.replace("ipfs://", "https://nftstorage.link/ipfs/"))
+        const { data } = await axios.get<MetaData>(tokenURI.replace("ipfs://", "https://nftstorage.link/ipfs/"))
 
-        if (image) return image
-        if (image_alt) return image_alt
-        ctx.log.error(`Data does not exist: ${image} ${image_alt}`)
+        if (data?.image) return data.image
+        if (data?.image_alt) return data.image_alt
+        ctx.log.error(`Data does not exist: ${data} ${tokenURI.replace("ipfs://", "https://nftstorage.link/ipfs/")}`)
         return null
       } catch (error) {
         ctx.log.error(`Fetching Image Error: ${tokenURI.replace("ipfs://", "https://nftstorage.link/ipfs/")} - ${error}`)
@@ -130,11 +130,11 @@ async function handleImage(tokenURI: string, ctx: Context) {
 
     } else {
       try {
-        const { data: { image, image_alt} } = await axios.get<MetaData>(tokenURI)
+        const { data } = await axios.get<MetaData>(tokenURI)
   
-        if (image) return image
-        if (image_alt) return image_alt
-        ctx.log.error(`Data does not exist: ${image} ${image_alt}`)
+        if (data?.image) return data.image
+        if (data?.image_alt) return data.image_alt
+        ctx.log.error(`Data does not exist: ${data} ${tokenURI}`)
         return null  
       } catch (error) {
         ctx.log.error(`Fetching Image Error: ${tokenURI} - ${error}`)
