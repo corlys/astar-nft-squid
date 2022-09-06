@@ -17,6 +17,7 @@ import { Owner, Token, Transfer, Contract } from "./model";
 import * as erc721 from "./abi/erc721";
 import { ethers } from "ethers";
 import axios from "axios"
+import { CID } from "multiformats/cid"
 
 const database = new TypeormDatabase();
 const processor = new SubstrateBatchProcessor()
@@ -111,36 +112,55 @@ function collectionWithTokenId (collection: string, tokenId: string): string {
   return `${collection}-${tokenId}`
 }
 
+function handleIpfsUri (uri: string, ctx: Context) {
+  try {
+    const splits = uri.split("/");
+
+    const possibleCid = splits.reduce(
+      function (a, b) {
+          return a.length > b.length ? a : b;
+      }
+    );
+
+    const cid = CID.asCID(CID.parse(possibleCid))
+    
+    if (cid) {
+      // astarDegens
+      if (uri.includes("ipfs://")) {
+        const constructURI = `https://${cid.toV1()}.ipfs.nftstorage.link/${splits[splits.length -1]}`
+        return constructURI
+      }
+      // astarCats
+      if (uri.includes("https://arweave.net")) {
+        return uri
+      }
+      // astarSignWitch
+      if (uri.includes("gateway.pinata.cloud")) {
+        const constructURI = `https://${cid.toV1()}.ipfs.nftstorage.link/${splits[splits.length -1]}`
+        return constructURI
+      }
+    }
+    
+    return uri
+  } catch (error) {
+    return uri
+  }
+}
+
 async function handleImage(tokenURI: string, ctx: Context) {
   try {
     // check if the URI is centralized of decentralizer
     // if its decentralized
     if (tokenURI.length === 0) return null
-    if (tokenURI.includes("ipfs://")) {
-      try {
-        const { data } = await axios.get<MetaData>(tokenURI.replace("ipfs://", "https://nftstorage.link/ipfs/"), { timeout: 40000 })
-
-        if (data?.image) return data.image
-        if (data?.image_alt) return data.image_alt
-        ctx.log.error(`Data does not exist: ${data} ${tokenURI.replace("ipfs://", "https://nftstorage.link/ipfs/")}`)
-        return null
-      } catch (error) {
-        ctx.log.error(`Fetching Image Error: ${tokenURI.replace("ipfs://", "https://nftstorage.link/ipfs/")} - ${error}`)
-        return null
-      }
-
-    } else {
-      try {
-        const { data } = await axios.get<MetaData>(tokenURI.replace("https://", "http://"), { timeout: 40000 })
-  
-        if (data?.image) return data.image
-        if (data?.image_alt) return data.image_alt
-        ctx.log.error(`Data does not exist: ${data} ${tokenURI}`)
-        return null  
-      } catch (error) {
-        ctx.log.error(`Fetching Image Error: ${tokenURI} - ${error}`)
-        return null
-      }
+    try {
+      const { data } = await axios.get<MetaData>(handleIpfsUri(tokenURI, ctx))
+      if (data?.image) return data.image
+      if (data?.image_alt) return data.image_alt
+      ctx.log.error(`Data does not exist: ${data} ${handleIpfsUri(tokenURI, ctx)}`)
+      return null
+    } catch (error) {
+      ctx.log.error(`Fetching Image Error: ${handleIpfsUri(tokenURI, ctx)} - ${error}`)
+      return null
     }
   } catch (error: any) {
     ctx.log.error(`error handleImage: ${error}`)
