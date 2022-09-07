@@ -328,23 +328,10 @@ async function saveTransfers(ctx: Context, transfersData: TransferData[]) {
         tokenId: parseInt(transferData.token),
       });
       tokens.set(token.id, token);
-    } 
-    // else {
-    //   const currentURI = await handleURI(ctx, blockHeight.height, transferData.contractAddress, transferData.token)
-    //   if (token.oldUri !== currentURI) tokens = await handleChangeURI(ctx, token.oldUri ?? "", blockHeight.height, transferData.contractAddress, tokens)
-
-    //   token = tokens.get(collectionWithTokenId(transferData.contractAddress, transferData.token));
-    //   if (token != null) {
-    //     token.owner = to
-    //     token.uri = currentURI
-    //     token.oldUri = token.uri
-    //     token.imageUri = await handleImage(token.uri, ctx)
-    //     tokens.set(token.id, token)
-    //     ctx.log.info(`${token.id} - ${token.uri} - ${token.imageUri} - ${token.oldUri}`)
-    //   }
-    // }
-
-    token.owner = to
+    } else {
+      token.owner = to
+      tokens.set(token.id, token);
+    }
 
     ctx.log.info(`${token.id} - ${token.uri} - ${token.imageUri} - ${token.oldUri}`)
 
