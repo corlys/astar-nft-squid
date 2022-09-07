@@ -184,7 +184,10 @@ async function handleNullImage (ctx: Context) {
     }
   }
 
-  await ctx.store.save([...tokens.values()])
+  if ([...tokens.values()].length > 0) {
+    await ctx.store.save([...tokens.values()])
+  }
+
 }
 
 async function handleChangeURI (
@@ -318,7 +321,6 @@ async function saveTransfers(ctx: Context, transfersData: TransferData[]) {
 
     let token = tokens.get(collectionWithTokenId(transferData.contractAddress, transferData.token));
     if (token == null) {
-      ctx.log.warn(`Collection before insert to token : ${JSON.stringify(collection)}`)
       const uri = await handleURI(ctx, blockHeight.height, transferData.contractAddress, transferData.token)
       token = new Token({
         id: collectionWithTokenId(transferData.contractAddress, transferData.token),
@@ -331,10 +333,11 @@ async function saveTransfers(ctx: Context, transfersData: TransferData[]) {
       tokens.set(token.id, token);
     } else {
       token.owner = to
+      token.contract = collection //waiting for fix from squid-devs
       tokens.set(token.id, token);
     }
 
-    ctx.log.warn(`${token.id} - ${token.uri} - ${token.imageUri} - ${token.oldUri} - ${token.contract?.id}`)
+    ctx.log.warn(`${token.id} - ${token.uri} - ${token.imageUri} - ${token.oldUri} - ${token.contract} ${collection.id}`)
 
     const { id, block, transactionHash, timestamp } = transferData;
 
