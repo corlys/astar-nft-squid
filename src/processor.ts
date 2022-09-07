@@ -329,6 +329,7 @@ async function saveTransfers(ctx: Context, transfersData: TransferData[]) {
         imageUri: await handleImage(uri, ctx),
         contract: collection,
         tokenId: parseInt(transferData.token),
+        owner: to //waiting for fix from squid-devs
       });
       tokens.set(token.id, token);
     } else {
