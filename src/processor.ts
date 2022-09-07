@@ -318,6 +318,7 @@ async function saveTransfers(ctx: Context, transfersData: TransferData[]) {
 
     let token = tokens.get(collectionWithTokenId(transferData.contractAddress, transferData.token));
     if (token == null) {
+      ctx.log.warn(`Collection before insert to token : ${JSON.stringify(collection)}`)
       const uri = await handleURI(ctx, blockHeight.height, transferData.contractAddress, transferData.token)
       token = new Token({
         id: collectionWithTokenId(transferData.contractAddress, transferData.token),
@@ -333,7 +334,7 @@ async function saveTransfers(ctx: Context, transfersData: TransferData[]) {
       tokens.set(token.id, token);
     }
 
-    ctx.log.info(`${token.id} - ${token.uri} - ${token.imageUri} - ${token.oldUri}`)
+    ctx.log.warn(`${token.id} - ${token.uri} - ${token.imageUri} - ${token.oldUri} - ${token.contract?.id}`)
 
     const { id, block, transactionHash, timestamp } = transferData;
 
