@@ -16,4 +16,13 @@ export class Owner {
 
   @Column_("numeric", {transformer: marshal.bigintTransformer, nullable: true})
   balance!: bigint | undefined | null
+
+  @Column_("int4", {nullable: true})
+  astarCatsBalance!: number | undefined | null
+
+  @Column_("int4", {nullable: true})
+  astarDegensBalance!: number | undefined | null
+
+  @Column_("int4", {nullable: true})
+  astarSignWitchBalance!: number | undefined | null
 }

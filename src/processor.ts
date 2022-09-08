@@ -232,6 +232,56 @@ async function handleURI (ctx: Context, height: number, contractAddress: string,
   }
 }
 
+function handleBalance (owner: Owner, address: string, mode: number) {
+  switch (owner.id) {
+    case "0x8b5d62f396ca3c6cf19803234685e693733f9779":
+      if (owner.astarCatsBalance === 0) {
+        owner.astarCatsBalance = 1;
+        return owner
+      } else {
+        if (mode === 0) {
+          owner.astarCatsBalance = owner.astarCatsBalance ?? 0 + 1;
+          return owner
+        } else if (mode === 1) {
+          owner.astarCatsBalance = owner.astarCatsBalance ?? 0 - 1;
+          return owner
+        }
+      }
+      break;
+    case "0xd59fc6bfd9732ab19b03664a45dc29b8421bda9a":
+      if (owner.astarDegensBalance === 0) {
+        owner.astarDegensBalance = 1;
+        return owner
+      } else {
+        if (mode === 0) {
+          owner.astarDegensBalance = owner.astarDegensBalance ?? 0 + 1;
+          return owner
+        } else if (mode === 1) {
+          owner.astarDegensBalance = owner.astarDegensBalance ?? 0 - 1;
+          return owner
+        }
+      }
+      break;
+    case "0x7b2152e51130439374672af463b735a59a47ea85":
+      if (owner.astarSignWitchBalance === 0) {
+        owner.astarSignWitchBalance = 1;
+        return owner
+      } else {
+        if (mode === 0) {
+          owner.astarSignWitchBalance = owner.astarSignWitchBalance ?? 0 + 1;
+          return owner
+        } else if (mode === 1) {
+          owner.astarSignWitchBalance = owner.astarSignWitchBalance ?? 0 - 1;
+          return owner
+        }
+      }
+      break;
+    default:
+      return owner
+      break;
+  }
+}
+
 function handleTransfer(
   block: SubstrateBlock,
   event: EvmLogEvent
@@ -322,6 +372,13 @@ async function saveTransfers(ctx: Context, transfersData: TransferData[]) {
     let token = tokens.get(collectionWithTokenId(transferData.contractAddress, transferData.token));
     if (token == null) {
       const uri = await handleURI(ctx, blockHeight.height, transferData.contractAddress, transferData.token)
+      
+      to = handleBalance(to, transferData.contractAddress, 0)
+
+      if (to != null) {
+        owners.set(to.id, to)
+      }
+
       token = new Token({
         id: collectionWithTokenId(transferData.contractAddress, transferData.token),
         uri,
@@ -333,6 +390,14 @@ async function saveTransfers(ctx: Context, transfersData: TransferData[]) {
       });
       tokens.set(token.id, token);
     } else {
+      to = handleBalance(to, transferData.contractAddress, 0)
+      from = handleBalance(from, transferData.contractAddress, 1)
+      if (to != null) {
+        owners.set(to.id, to)
+      }
+      if (from != null) {
+        owners.set(from.id, from)
+      }
       token.owner = to
       token.contract = collection //waiting for fix from squid-devs
       tokens.set(token.id, token);
