@@ -233,7 +233,7 @@ async function handleURI (ctx: Context, height: number, contractAddress: string,
 }
 
 function handleBalance (owner: Owner, address: string, mode: number) {
-  switch (owner.id) {
+  switch (address) {
     case "0x8b5d62f396ca3c6cf19803234685e693733f9779":
       if (owner.astarCatsBalance === 0) {
         owner.astarCatsBalance = 1;
