@@ -53,6 +53,7 @@ processor.run(database, async (ctx) => {
 
   await saveTransfers(ctx, transfersData);
   await handleNullImage(ctx)
+  ctx.log.info("Round Finish")
 });
 
 type TransferData = {
@@ -232,52 +233,90 @@ async function handleURI (ctx: Context, height: number, contractAddress: string,
   }
 }
 
-function handleBalance (owner: Owner, address: string, mode: number) {
+function handleBalance (ownersMap: Map<string, Owner> ,owner: Owner, address: string, mode: number) {
+  let _owner = ownersMap.get(owner.id)
+  if (_owner == null) return ownersMap
   switch (address) {
     case "0x8b5d62f396ca3c6cf19803234685e693733f9779":
-      if (owner.astarCatsBalance === 0) {
-        owner.astarCatsBalance = 1;
-        return owner
+      if (_owner.astarCatsBalance == null) {
+        _owner.astarCatsBalance = 1;
+        ownersMap.set(_owner.id, _owner)
+        return ownersMap
       } else {
         if (mode === 0) {
-          owner.astarCatsBalance = owner.astarCatsBalance ?? 0 + 1;
-          return owner
+          _owner.astarCatsBalance = _owner.astarCatsBalance + 1;
+          ownersMap.set(_owner.id, _owner)
+          return ownersMap
         } else if (mode === 1) {
-          owner.astarCatsBalance = owner.astarCatsBalance ?? 0 - 1;
-          return owner
+          _owner.astarCatsBalance = _owner.astarCatsBalance - 1; 
+          ownersMap.set(_owner.id, _owner)
+          return ownersMap
+        } else {
+          return ownersMap
         }
       }
       break;
     case "0xd59fc6bfd9732ab19b03664a45dc29b8421bda9a":
-      if (owner.astarDegensBalance === 0) {
-        owner.astarDegensBalance = 1;
-        return owner
+      if (_owner.astarDegensBalance == null) {
+        _owner.astarDegensBalance = 1;
+        
+        ownersMap.set(_owner.id, _owner)
+        return ownersMap
       } else {
         if (mode === 0) {
-          owner.astarDegensBalance = owner.astarDegensBalance ?? 0 + 1;
-          return owner
+          _owner.astarDegensBalance = _owner.astarDegensBalance + 1;
+          ownersMap.set(_owner.id, _owner)
+          return ownersMap
         } else if (mode === 1) {
-          owner.astarDegensBalance = owner.astarDegensBalance ?? 0 - 1;
-          return owner
+          _owner.astarDegensBalance = _owner.astarDegensBalance - 1;
+          ownersMap.set(_owner.id, _owner)
+          return ownersMap
+        } else {
+          return ownersMap
         }
       }
       break;
     case "0x7b2152e51130439374672af463b735a59a47ea85":
-      if (owner.astarSignWitchBalance === 0) {
-        owner.astarSignWitchBalance = 1;
-        return owner
+      if (_owner.astarSignWitchBalance == null) {
+        _owner.astarSignWitchBalance = 1;
+        ownersMap.set(_owner.id, _owner)
+        return ownersMap
       } else {
         if (mode === 0) {
-          owner.astarSignWitchBalance = owner.astarSignWitchBalance ?? 0 + 1;
-          return owner
+          _owner.astarSignWitchBalance = _owner.astarSignWitchBalance + 1;
+          ownersMap.set(_owner.id, _owner)
+          return ownersMap
         } else if (mode === 1) {
-          owner.astarSignWitchBalance = owner.astarSignWitchBalance ?? 0 - 1;
-          return owner
+          _owner.astarSignWitchBalance = _owner.astarSignWitchBalance - 1;
+          ownersMap.set(_owner.id, _owner)
+          return ownersMap
+        } else {
+          return ownersMap
+        }
+      }
+      break;
+    case "0x05a1ed91d2760b751cbe68dd2c644f182069782c":
+      if (_owner.astarB2EBalance == null) {
+        _owner.astarB2EBalance = 1;
+        ownersMap.set(_owner.id, _owner)
+        return ownersMap
+      } else {
+        if (mode === 0) {
+          _owner.astarB2EBalance = _owner.astarB2EBalance + 1;
+          ownersMap.set(_owner.id, _owner)
+          return ownersMap
+        } else if (mode === 1) {
+          _owner.astarB2EBalance = _owner.astarB2EBalance - 1;
+          ownersMap.set(_owner.id, _owner)
+          return ownersMap
+        } else {
+          return ownersMap
         }
       }
       break;
     default:
-      return owner
+      ownersMap.set(_owner.id, _owner)
+      return ownersMap
       break;
   }
 }
@@ -329,7 +368,7 @@ async function saveTransfers(ctx: Context, transfersData: TransferData[]) {
     ])
   );
 
-  const owners: Map<string, Owner> = new Map(
+  let owners: Map<string, Owner> = new Map(
     (await ctx.store.findBy(Owner, { id: In([...ownersIds]) })).map((owner) => [
       owner.id,
       owner,
@@ -373,11 +412,8 @@ async function saveTransfers(ctx: Context, transfersData: TransferData[]) {
     if (token == null) {
       const uri = await handleURI(ctx, blockHeight.height, transferData.contractAddress, transferData.token)
       
-      to = handleBalance(to, transferData.contractAddress, 0)
-
-      if (to != null) {
-        owners.set(to.id, to)
-      }
+      owners = handleBalance(owners ,to, transferData.contractAddress, 0)
+      to = owners.get(transferData.to);
 
       token = new Token({
         id: collectionWithTokenId(transferData.contractAddress, transferData.token),
@@ -390,14 +426,11 @@ async function saveTransfers(ctx: Context, transfersData: TransferData[]) {
       });
       tokens.set(token.id, token);
     } else {
-      to = handleBalance(to, transferData.contractAddress, 0)
-      from = handleBalance(from, transferData.contractAddress, 1)
-      if (to != null) {
-        owners.set(to.id, to)
-      }
-      if (from != null) {
-        owners.set(from.id, from)
-      }
+      owners = handleBalance(owners, to, transferData.contractAddress, 0)
+      owners = handleBalance(owners, from, transferData.contractAddress, 1)
+      to = owners.get(transferData.to);
+      from = owners.get(transferData.from);
+ 
       token.owner = to
       token.contract = collection //waiting for fix from squid-devs
       tokens.set(token.id, token);

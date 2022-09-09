@@ -25,4 +25,7 @@ export class Owner {
 
   @Column_("int4", {nullable: true})
   astarSignWitchBalance!: number | undefined | null
+
+  @Column_("int4", {nullable: true})
+  astarB2EBalance!: number | undefined | null
 }

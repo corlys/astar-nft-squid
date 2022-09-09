@@ -16,6 +16,7 @@ type Owner @entity {
   astarCatsBalance: Int
   astarDegensBalance: Int
   astarSignWitchBalance: Int
+  astarB2EBalance: Int
 }
 
 type Contract @entity {
