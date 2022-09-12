@@ -10,7 +10,7 @@ import {
 } from "@subsquid/substrate-processor";
 import { FindOperator, In, IsNull } from "typeorm";
 import {
-  CHAIN_NODE,
+  CHAIN_NODE, contractMapping
 } from "./contract";
 import { getWhitelistNFT } from "./helper/whitelistnftlist"
 import { Owner, Token, Transfer, Contract } from "./model";
@@ -321,6 +321,51 @@ function handleBalance (ownersMap: Map<string, Owner> ,owner: Owner, address: st
   }
 }
 
+async function handleContractName(ctx: Context, height: number, contractAddress: string) {
+  try {
+    const hardCodedBlockHeight = 1789333;
+    const tokenContract = new erc721.Contract(ctx, { height: hardCodedBlockHeight > height ? hardCodedBlockHeight : height }, contractAddress);
+    return await tokenContract.name();
+  } catch (error) {
+    return null
+  }
+}
+
+async function handleContractSymbol(ctx: Context, height: number, contractAddress: string) {
+  try {
+    const hardCodedBlockHeight = 1789333;
+    const tokenContract = new erc721.Contract(ctx, { height: hardCodedBlockHeight > height ? hardCodedBlockHeight : height }, contractAddress);
+    return await tokenContract.symbol();
+  } catch (error) {
+    return null
+  }
+}
+
+async function handleContractTotalSupply(ctx: Context, height: number, contractAddress: string) {
+  try {
+    const hardCodedBlockHeight = 1789333;
+    const tokenContract = new erc721.Contract(ctx, { height: hardCodedBlockHeight > height ? hardCodedBlockHeight : height }, contractAddress);
+    return await tokenContract.totalSupply();
+  } catch (error) {
+    return null
+  }
+}
+
+async function handleContract(ctx: Context, height: number, contractAddress: string) {
+  const cacheContract = contractMapping.get(contractAddress)
+  if (cacheContract) return cacheContract
+  const totalSupply = await handleContractTotalSupply(ctx, height, contractAddress)
+  const typeFriendlyTotalSupply = totalSupply ? totalSupply.toBigInt() : ethers.BigNumber.from("0").toBigInt();
+  const contractObject = new Contract({
+    id: contractAddress,
+    name: await handleContractName(ctx, height, contractAddress),
+    symbol: await handleContractSymbol(ctx, height, contractAddress),
+    totalSupply: typeFriendlyTotalSupply
+  })
+  contractMapping.set(contractAddress, contractObject)
+  return contractObject
+}
+
 function handleTransfer(
   block: SubstrateBlock,
   event: EvmLogEvent
@@ -388,12 +433,9 @@ async function saveTransfers(ctx: Context, transfersData: TransferData[]) {
 
     let collection = collections.get(transferData.contractAddress)
     if (collection == null) {
-      collection = new Contract(
-        {
-          id: transferData.contractAddress,
-        }
-      )
+      collection = await handleContract(ctx, transferData.block, transferData.contractAddress)
       collections.set(collection.id, collection)
+      console.log(collection.id, collection.name, collection.symbol, collection.totalSupply)
     }
 
     let from = owners.get(transferData.from);
