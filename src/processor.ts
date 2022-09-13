@@ -41,7 +41,9 @@ processor.run(database, async (ctx) => {
     for (const item of block.items) {
       if (item.name === "EVM.Log") {
         // ctx.log.info(item.event.args?.address)
-        const topics: string[] = item.event.args.topics;
+        const event = item.event;
+        let evmLog = event.args.log || event.args; 
+        const topics: string[] = evmLog.topics
         if (topics[0] === erc721.events["Transfer(address,address,uint256)"].topic) {
           ctx.log.info(`${item.event.args.address} ${block.header.height}`)
           const transfer = handleTransfer(block.header, item.event);
