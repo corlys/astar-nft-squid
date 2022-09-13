@@ -45,7 +45,6 @@ processor.run(database, async (ctx) => {
         let evmLog = event.args.log || event.args; 
         const topics: string[] = evmLog.topics
         if (topics[0] === erc721.events["Transfer(address,address,uint256)"].topic) {
-          ctx.log.info(`${item.event.args.address} ${block.header.height}`)
           const transfer = handleTransfer(block.header, item.event);
           if (transfer) transfersData.push(transfer);
         }
@@ -72,6 +71,32 @@ type TransferData = {
 type MetaData = {
   image?: string;
   image_alt?: string
+}
+
+function handleTransfer(
+  block: SubstrateBlock,
+  event: EvmLogEvent
+): TransferData | null {
+  try {
+    const log = event.args.log || event.args
+    const { from, to, tokenId } = erc721.events[
+      "Transfer(address,address,uint256)"
+    ].decode(log);
+    const transfer: TransferData = {
+      id: event.id,
+      token: tokenId.toString(),
+      from,
+      to,
+      timestamp: BigInt(block.timestamp),
+      block: block.height,
+      transactionHash: event.evmTxHash,
+      contractAddress: log.address,
+    };
+  
+    return transfer;
+  } catch (error) {
+    return null
+  }
 }
 
 async function isErc721 (ctx: Context, blockHeight: number, contractAddress: string): Promise<boolean> {
@@ -366,32 +391,6 @@ async function handleContract(ctx: Context, height: number, contractAddress: str
   })
   contractMapping.set(contractAddress, contractObject)
   return contractObject
-}
-
-function handleTransfer(
-  block: SubstrateBlock,
-  event: EvmLogEvent
-): TransferData | null {
-  try {
-    const { from, to, tokenId } = erc721.events[
-      "Transfer(address,address,uint256)"
-    ].decode(event.args);
-  
-    const transfer: TransferData = {
-      id: event.id,
-      token: tokenId.toString(),
-      from,
-      to,
-      timestamp: BigInt(block.timestamp),
-      block: block.height,
-      transactionHash: event.evmTxHash,
-      contractAddress: event.args.address,
-    };
-  
-    return transfer;
-  } catch (error) {
-    return null
-  }
 }
 
 async function saveTransfers(ctx: Context, transfersData: TransferData[]) {
