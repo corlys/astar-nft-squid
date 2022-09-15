@@ -137,7 +137,7 @@ async function isErc721 (ctx: Context, blockHeight: number, contractAddress: str
 }
 
 function collectionWithTokenId (collection: string, tokenId: string): string {
-  return `${collection}-${tokenId}`
+  return `${contractMapping.get(collection)?.symbol || collection}-${tokenId}`
 }
 
 function handleIpfsUri (uri: string, ctx: Context) {
@@ -399,6 +399,7 @@ async function saveTransfers(ctx: Context, transfersData: TransferData[]) {
   const contractAddresses: Set<string> = new Set();
 
   for (const transferData of transfersData) {
+    await handleContract(ctx, transferData.block, transferData.contractAddress)
     tokensIds.add(collectionWithTokenId(transferData.contractAddress, transferData.token));
     ownersIds.add(transferData.from);
     ownersIds.add(transferData.to);
